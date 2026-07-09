@@ -15,9 +15,8 @@ public import Mathlib.Analysis.InnerProductSpace.HilbertSchmidt
 For a linear map `T` between finite-dimensional inner product spaces, the sum of the squared
 singular values equals the real part of the trace of `adjoint T ∘ₗ T`, i.e. the squared
 Hilbert–Schmidt (Frobenius) norm of `T`. That norm is provided by
-`Mathlib.Analysis.InnerProductSpace.HilbertSchmidt` (activated here with
-`open scoped LinearMap.Norms.HilbertSchmidt`), so the main results below are stated in terms of
-`‖·‖`.
+`Mathlib.Analysis.InnerProductSpace.HilbertSchmidt` as a global instance on the type synonym
+`WithLp 2 (E →ₗ[𝕜] F)`, so the main results below are stated in terms of `‖WithLp.toLp 2 ·‖`.
 
 This identity is the bridge that lets an Eckart–Young–Mirsky theorem (best rank-`k`
 approximation) be stated in terms of `LinearMap.singularValues`.
@@ -31,12 +30,13 @@ approximation) be stated in terms of `LinearMap.singularValues`.
 
 ## Main statements
 
-- `LinearMap.hilbertSchmidt_norm_sq_eq_sum_sq_singularValues`:
-  `‖T‖ ^ 2 = ∑ i, (T.singularValues i) ^ 2`.
+- `LinearMap.hilbertSchmidt_norm_sq_toLp_eq_sum_sq_singularValues`:
+  `‖WithLp.toLp 2 T‖ ^ 2 = ∑ i, (T.singularValues i) ^ 2`.
 - `LinearMap.kyFan_le`: **Ky Fan's maximal principle**, the `≤` direction — for a rank-`k`
   orthogonal projection `Q`, `re (trace (Q ∘ₗ adjoint T ∘ₗ T)) ≤ topSqSingularValues T k`.
 - `LinearMap.eckart_young`: **Eckart–Young–Mirsky** — `tailSqSingularValues T k` is the
-  least squared Frobenius error `‖T - S‖ ^ 2` over all `S` with `finrank (range S) ≤ k`.
+  least squared Frobenius error `‖WithLp.toLp 2 (T - S)‖ ^ 2` over all `S` with
+  `finrank (range S) ≤ k`.
 - `LinearMap.sum_sq_singularValues_eq_re_trace`:
   `∑ i, (T.singularValues i) ^ 2 = re (trace (adjoint T ∘ₗ T))`.
 -/
@@ -44,7 +44,6 @@ approximation) be stated in terms of `LinearMap.singularValues`.
 public section
 
 open Module InnerProductSpace Finset
-open scoped LinearMap.Norms.HilbertSchmidt
 
 /-- **Bathtub / rearrangement bound** (the elementary combinatorial core of Ky Fan's maximal
 principle). For a descending nonnegative sequence `lam` and weights `c ∈ [0,1]` summing to `k`,
@@ -106,9 +105,9 @@ private theorem sum_filter_sq_singularValues_eq_range (T : E →ₗ[𝕜] F) (k 
   rw [T.singularValues_of_finrank_le (by omega)]; ring
 
 /-- The squared Hilbert–Schmidt (Frobenius) norm of `T` equals `∑ᵢ σ_i(T)²`. -/
-theorem hilbertSchmidt_norm_sq_eq_sum_sq_singularValues (T : E →ₗ[𝕜] F) :
-    ‖T‖ ^ 2 = ∑ i ∈ Finset.range (finrank 𝕜 E), (T.singularValues i) ^ 2 :=
-  (hilbertSchmidt_norm_sq_eq_re_trace T).trans (sum_sq_singularValues_eq_re_trace T).symm
+theorem hilbertSchmidt_norm_sq_toLp_eq_sum_sq_singularValues (T : E →ₗ[𝕜] F) :
+    ‖WithLp.toLp 2 T‖ ^ 2 = ∑ i ∈ Finset.range (finrank 𝕜 E), (T.singularValues i) ^ 2 :=
+  (hilbertSchmidt_norm_sq_toLp_eq_re_trace T).trans (sum_sq_singularValues_eq_re_trace T).symm
 
 /-- Sum of the top `k` squared singular values of `T`, `∑ i < k, σ_i(T)²`. -/
 @[expose] noncomputable def topSqSingularValues (T : E →ₗ[𝕜] F) (k : ℕ) : ℝ :=
@@ -139,29 +138,29 @@ theorem topSqSingularValues_mono (T : E →ₗ[𝕜] F) {k₁ k₂ : ℕ} (h : k
 /-- For `k ≥ finrank 𝕜 E` all singular values past the domain dimension vanish, so the top-`k`
 sum is the full squared norm. -/
 theorem topSqSingularValues_of_finrank_le (T : E →ₗ[𝕜] F) {k : ℕ} (h : finrank 𝕜 E ≤ k) :
-    topSqSingularValues T k = ‖T‖ ^ 2 := by
+    topSqSingularValues T k = ‖WithLp.toLp 2 T‖ ^ 2 := by
   have hz : ∑ i ∈ Finset.Ico (finrank 𝕜 E) k, T.singularValues i ^ 2 = 0 :=
     Finset.sum_eq_zero fun i hi => by
       simp [T.singularValues_of_finrank_le (Finset.mem_Ico.mp hi).1]
-  rw [hilbertSchmidt_norm_sq_eq_sum_sq_singularValues, topSqSingularValues,
+  rw [hilbertSchmidt_norm_sq_toLp_eq_sum_sq_singularValues, topSqSingularValues,
     ← Finset.sum_range_add_sum_Ico (fun i => T.singularValues i ^ 2) h, hz, add_zero]
 
 theorem topSqSingularValues_le_norm_sq (T : E →ₗ[𝕜] F) (k : ℕ) :
-    topSqSingularValues T k ≤ ‖T‖ ^ 2 := by
+    topSqSingularValues T k ≤ ‖WithLp.toLp 2 T‖ ^ 2 := by
   rw [← topSqSingularValues_of_finrank_le T (Nat.le_add_left (finrank 𝕜 E) k)]
   exact topSqSingularValues_mono T (Nat.le_add_right k (finrank 𝕜 E))
 
 /-- The tail sum equals the total squared Hilbert–Schmidt norm minus the top-`k` sum. -/
 theorem tailSqSingularValues_eq_norm_sq_sub (T : E →ₗ[𝕜] F) (k : ℕ) :
-    tailSqSingularValues T k = ‖T‖ ^ 2 - topSqSingularValues T k := by
+    tailSqSingularValues T k = ‖WithLp.toLp 2 T‖ ^ 2 - topSqSingularValues T k := by
   rcases le_total k (finrank 𝕜 E) with h | h
-  · rw [tailSqSingularValues_eq_sum_Ico, hilbertSchmidt_norm_sq_eq_sum_sq_singularValues,
+  · rw [tailSqSingularValues_eq_sum_Ico, hilbertSchmidt_norm_sq_toLp_eq_sum_sq_singularValues,
       topSqSingularValues, Finset.sum_Ico_eq_sub _ h]
   · rw [tailSqSingularValues_eq_sum_Ico, Finset.Ico_eq_empty (not_lt.mpr h), Finset.sum_empty,
       topSqSingularValues_of_finrank_le T h, sub_self]
 
 theorem topSqSingularValues_add_tailSqSingularValues (T : E →ₗ[𝕜] F) (k : ℕ) :
-    topSqSingularValues T k + tailSqSingularValues T k = ‖T‖ ^ 2 := by
+    topSqSingularValues T k + tailSqSingularValues T k = ‖WithLp.toLp 2 T‖ ^ 2 := by
   rw [tailSqSingularValues_eq_norm_sq_sub]; ring
 
 /-- **Ky Fan's maximal principle** (the `≤` direction, operator form). For an orthogonal
@@ -205,17 +204,18 @@ theorem kyFan_le (T : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E) (hQ : Q.IsSymmetr
     (fun i => by rw [← T.sq_singularValues_fin rfl i]; positivity) hc0 hc1 hk hsum_c
 
 /-- Frobenius–Pythagoras identity: for a symmetric projection (orthogonal projection) `P`,
-`‖M ∘ₗ P‖² = re tr(P ∘ₗ adjoint M ∘ₗ M)`. -/
+`‖toLp 2 (M ∘ₗ P)‖² = re tr(P ∘ₗ adjoint M ∘ₗ M)`. -/
 theorem hilbertSchmidt_norm_sq_comp_proj (M : E →ₗ[𝕜] F) (P : E →ₗ[𝕜] E)
     (hP : P.IsSymmetricProjection) :
-    ‖M ∘ₗ P‖ ^ 2 = RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint M ∘ₗ M))) := by
-  rw [hilbertSchmidt_norm_sq_eq_re_trace, LinearMap.adjoint_comp, hP.isSymmetric.adjoint_eq]
+    ‖WithLp.toLp 2 (M ∘ₗ P)‖ ^ 2
+      = RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint M ∘ₗ M))) := by
+  rw [hilbertSchmidt_norm_sq_toLp_eq_re_trace, LinearMap.adjoint_comp, hP.isSymmetric.adjoint_eq]
   congr 1
   change LinearMap.trace 𝕜 E (P ∘ₗ ((adjoint M ∘ₗ M) ∘ₗ P)) = _
   rw [LinearMap.trace_comp_comm' ((adjoint M ∘ₗ M) ∘ₗ P) P, LinearMap.comp_assoc,
     show P ∘ₗ P = P from hP.isIdempotentElem, LinearMap.trace_comp_comm' P (adjoint M ∘ₗ M)]
 
-/-- The dropped Frobenius sum `re tr(P ∘ₗ adjoint M ∘ₗ M) = ‖M ∘ₗ P‖² ≥ 0`. -/
+/-- The dropped Frobenius sum `re tr(P ∘ₗ adjoint M ∘ₗ M) = ‖toLp 2 (M ∘ₗ P)‖² ≥ 0`. -/
 theorem re_trace_proj_comp_self_nonneg (M : E →ₗ[𝕜] F) (P : E →ₗ[𝕜] E)
     (hP : P.IsSymmetricProjection) :
     0 ≤ RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint M ∘ₗ M))) :=
@@ -224,18 +224,18 @@ theorem re_trace_proj_comp_self_nonneg (M : E →ₗ[𝕜] F) (P : E →ₗ[𝕜
 /-- Frobenius–Pythagoras (identity form) for the complementary projection `1 - Q`. -/
 theorem hilbertSchmidt_norm_sq_comp_one_sub_proj (M : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E)
     (hQ : Q.IsSymmetricProjection) :
-    ‖M ∘ₗ (1 - Q)‖ ^ 2
-      = ‖M‖ ^ 2 - RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint M ∘ₗ M))) := by
+    ‖WithLp.toLp 2 (M ∘ₗ (1 - Q))‖ ^ 2
+      = ‖WithLp.toLp 2 M‖ ^ 2 - RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint M ∘ₗ M))) := by
   rw [hilbertSchmidt_norm_sq_comp_proj M (1 - Q)
       ⟨hQ.isIdempotentElem.one_sub, IsSymmetric.sub (fun _ _ => rfl) hQ.isSymmetric⟩,
     LinearMap.sub_comp, Module.End.one_eq_id, LinearMap.id_comp, map_sub, map_sub,
-    hilbertSchmidt_norm_sq_eq_re_trace M]
+    hilbertSchmidt_norm_sq_toLp_eq_re_trace M]
 
 /-- **Frobenius–Pythagoras inequality.** Composing with `1 - Q` for an orthogonal projection `Q`
 can only shrink the squared Frobenius norm. -/
 theorem hilbertSchmidt_norm_sq_comp_one_sub_proj_le (M : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E)
     (hQ : Q.IsSymmetricProjection) :
-    ‖M ∘ₗ (1 - Q)‖ ^ 2 ≤ ‖M‖ ^ 2 := by
+    ‖WithLp.toLp 2 (M ∘ₗ (1 - Q))‖ ^ 2 ≤ ‖WithLp.toLp 2 M‖ ^ 2 := by
   rw [hilbertSchmidt_norm_sq_comp_one_sub_proj M Q hQ]
   linarith [re_trace_proj_comp_self_nonneg M Q hQ]
 
@@ -245,7 +245,7 @@ error at least the tail sum `∑_{i ≥ k} σ_i(T)²`. The witness is the orthog
 Frobenius–Pythagoras. -/
 theorem eckart_young_lower (T : E →ₗ[𝕜] F) (k : ℕ) (S : E →ₗ[𝕜] F)
     (hS : finrank 𝕜 (LinearMap.range S) ≤ k) :
-    tailSqSingularValues T k ≤ ‖T - S‖ ^ 2 := by
+    tailSqSingularValues T k ≤ ‖WithLp.toLp 2 (T - S)‖ ^ 2 := by
   classical
   set Q : E →ₗ[𝕜] E := (((LinearMap.ker S)ᗮ).starProjection : E →ₗ[𝕜] E) with hQ
   have hQP : Q.IsSymmetricProjection := Submodule.isSymmetricProjection_starProjection _
@@ -262,18 +262,21 @@ theorem eckart_young_lower (T : E →ₗ[𝕜] F) (k : ℕ) (S : E →ₗ[𝕜] 
   have hTS : (T - S) ∘ₗ (1 - Q) = T ∘ₗ (1 - Q) := by rw [LinearMap.sub_comp, hSQ, sub_zero]
   have hky : RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint T ∘ₗ T))) ≤ topSqSingularValues T k :=
     (kyFan_le T Q hQP rfl).trans (topSqSingularValues_mono T hrankQ)
-  calc tailSqSingularValues T k = ‖T‖ ^ 2 - topSqSingularValues T k :=
+  calc tailSqSingularValues T k = ‖WithLp.toLp 2 T‖ ^ 2 - topSqSingularValues T k :=
       tailSqSingularValues_eq_norm_sq_sub T k
-    _ ≤ ‖T‖ ^ 2 - RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint T ∘ₗ T))) := by linarith
-    _ = ‖T ∘ₗ (1 - Q)‖ ^ 2 := (hilbertSchmidt_norm_sq_comp_one_sub_proj T Q hQP).symm
-    _ = ‖(T - S) ∘ₗ (1 - Q)‖ ^ 2 := by rw [hTS]
-    _ ≤ ‖T - S‖ ^ 2 := hilbertSchmidt_norm_sq_comp_one_sub_proj_le (T - S) Q hQP
+    _ ≤ ‖WithLp.toLp 2 T‖ ^ 2 - RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint T ∘ₗ T))) := by
+      linarith
+    _ = ‖WithLp.toLp 2 (T ∘ₗ (1 - Q))‖ ^ 2 :=
+      (hilbertSchmidt_norm_sq_comp_one_sub_proj T Q hQP).symm
+    _ = ‖WithLp.toLp 2 ((T - S) ∘ₗ (1 - Q))‖ ^ 2 := by rw [hTS]
+    _ ≤ ‖WithLp.toLp 2 (T - S)‖ ^ 2 :=
+      hilbertSchmidt_norm_sq_comp_one_sub_proj_le (T - S) Q hQP
 
 /-- **Eckart–Young–Mirsky achievability.** The truncated SVD — projecting onto the span of the
 top-`k` right singular vectors — attains the tail sum `∑_{i ≥ k} σ_i(T)²`. -/
 theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
     ∃ S : E →ₗ[𝕜] F, finrank 𝕜 (LinearMap.range S) ≤ k ∧
-      ‖T - S‖ ^ 2 = tailSqSingularValues T k := by
+      ‖WithLp.toLp 2 (T - S)‖ ^ 2 = tailSqSingularValues T k := by
   classical
   have hSsymm : (adjoint T ∘ₗ T).IsSymmetric := T.isSymmetric_adjoint_comp_self
   set b := hSsymm.eigenvectorBasis (rfl : finrank 𝕜 E = finrank 𝕜 E) with hb
@@ -315,7 +318,7 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
     rw [hP, Submodule.range_starProjection, hU]
     refine (finrank_span_finset_le_card _).trans (Finset.card_image_le.trans ?_)
     simp [hs, Fin.card_filter_val_lt]
-  · -- ‖T - T ∘ₗ P‖² = tailSqSingularValues T k
+  · -- ‖toLp 2 (T - T ∘ₗ P)‖² = tailSqSingularValues T k
     have hTS : T - T ∘ₗ P = T ∘ₗ (1 - P) := by
       rw [LinearMap.comp_sub, Module.End.one_eq_id, LinearMap.comp_id]
     rw [hTS, hilbertSchmidt_norm_sq_comp_one_sub_proj T P hPP, hPtr,
@@ -324,7 +327,8 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
 /-- **Eckart–Young–Mirsky (Frobenius / Hilbert–Schmidt).** The minimum squared Frobenius error of
 a rank-`≤ k` approximation of `T` is the tail sum `∑_{i ≥ k} σ_i(T)²`. -/
 theorem eckart_young (T : E →ₗ[𝕜] F) (k : ℕ) :
-    IsLeast {r : ℝ | ∃ S : E →ₗ[𝕜] F, finrank 𝕜 (LinearMap.range S) ≤ k ∧ r = ‖T - S‖ ^ 2}
+    IsLeast {r : ℝ | ∃ S : E →ₗ[𝕜] F, finrank 𝕜 (LinearMap.range S) ≤ k ∧
+        r = ‖WithLp.toLp 2 (T - S)‖ ^ 2}
       (tailSqSingularValues T k) :=
   ⟨(eckart_young_achievable T k).imp fun _ h => ⟨h.1, h.2.symm⟩,
     fun _ ⟨S, hS, hr⟩ => hr.symm ▸ eckart_young_lower T k S hS⟩
