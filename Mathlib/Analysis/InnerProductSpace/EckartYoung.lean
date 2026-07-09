@@ -56,9 +56,7 @@ private lemma weighted_sum_le_top {N : ℕ} {lam : Fin N → ℝ} (hanti : Antit
   classical
   set e : Fin N → ℝ := fun i => (if (i : ℕ) < k then (1 : ℝ) else 0) - c i with he
   have hsum_e : ∑ i, e i = 0 := by
-    have hcard : (univ.filter (fun i : Fin N => (i : ℕ) < k)).card = k := by
-      rw [Fin.card_filter_val_lt]; omega
-    simp only [he, Finset.sum_sub_distrib, Finset.sum_boole, hcard, hsum, sub_self]
+    simp [he, Finset.sum_sub_distrib, Fin.card_filter_val_lt, Nat.min_eq_right hk, hsum]
   rw [Finset.sum_filter, ← sub_nonneg, ← Finset.sum_sub_distrib,
     Finset.sum_congr rfl fun (i : Fin N) _ =>
       show (if (i : ℕ) < k then lam i else 0) - lam i * c i = lam i * e i by
@@ -66,22 +64,18 @@ private lemma weighted_sum_le_top {N : ℕ} {lam : Fin N → ℝ} (hanti : Antit
   rcases Nat.lt_or_ge k N with hkN | hkN
   · -- shift by `τ = lam k`: each term `(lam i - τ) * e i` is nonneg by the sign pattern of `e`
     have hshift : ∑ i, lam i * e i = ∑ i, (lam i - lam ⟨k, hkN⟩) * e i := by
-      rw [← sub_eq_zero, ← Finset.sum_sub_distrib,
-        Finset.sum_congr rfl fun i _ =>
-          show lam i * e i - (lam i - lam ⟨k, hkN⟩) * e i = lam ⟨k, hkN⟩ * e i by ring,
-        ← Finset.mul_sum, hsum_e, mul_zero]
+      simp only [sub_mul, Finset.sum_sub_distrib, ← Finset.mul_sum, hsum_e, mul_zero, sub_zero]
     rw [hshift]
     refine Finset.sum_nonneg fun i _ => ?_
-    by_cases h : (i : ℕ) < k
-    · have hτle : lam ⟨k, hkN⟩ ≤ lam i := hanti (Fin.le_def.mpr (by simp; omega))
-      simp only [he, if_pos h]
-      exact mul_nonneg (by linarith) (by linarith [hc1 i])
-    · have hleτ : lam i ≤ lam ⟨k, hkN⟩ := hanti (Fin.le_def.mpr (by simp; omega))
-      simp only [he, if_neg h]
-      nlinarith [hc0 i]
+    rcases lt_or_ge (i : ℕ) k with h | h
+    · simp only [he, if_pos h]
+      exact mul_nonneg (sub_nonneg.mpr (hanti (Fin.le_def.mpr h.le))) (sub_nonneg.mpr (hc1 i))
+    · simp only [he, if_neg (not_lt.mpr h)]
+      exact mul_nonneg_of_nonpos_of_nonpos (sub_nonpos.mpr (hanti (Fin.le_def.mpr h)))
+        (sub_nonpos.mpr (hc0 i))
   · refine Finset.sum_nonneg fun i _ => ?_
     simp only [he, if_pos (lt_of_lt_of_le i.isLt hkN)]
-    exact mul_nonneg (hnn i) (by linarith [hc1 i])
+    exact mul_nonneg (hnn i) (sub_nonneg.mpr (hc1 i))
 
 namespace LinearMap
 
@@ -132,15 +126,15 @@ theorem tailSqSingularValues_eq_sum_Ico (T : E →ₗ[𝕜] F) (k : ℕ) :
     tailSqSingularValues T k = ∑ i ∈ Finset.Ico k (finrank 𝕜 E), (T.singularValues i) ^ 2 := rfl
 
 theorem topSqSingularValues_nonneg (T : E →ₗ[𝕜] F) (k : ℕ) : 0 ≤ topSqSingularValues T k :=
-  Finset.sum_nonneg fun i _ => by positivity
+  Finset.sum_nonneg fun _ _ => sq_nonneg _
 
 theorem tailSqSingularValues_nonneg (T : E →ₗ[𝕜] F) (k : ℕ) : 0 ≤ tailSqSingularValues T k :=
-  Finset.sum_nonneg fun i _ => by positivity
+  Finset.sum_nonneg fun _ _ => sq_nonneg _
 
 theorem topSqSingularValues_mono (T : E →ₗ[𝕜] F) {k₁ k₂ : ℕ} (h : k₁ ≤ k₂) :
     topSqSingularValues T k₁ ≤ topSqSingularValues T k₂ :=
-  Finset.sum_le_sum_of_subset_of_nonneg (Finset.range_subset_range.mpr h) fun i _ _ => by
-    positivity
+  Finset.sum_le_sum_of_subset_of_nonneg (Finset.range_subset_range.mpr h) fun _ _ _ =>
+    sq_nonneg _
 
 /-- For `k ≥ finrank 𝕜 E` all singular values past the domain dimension vanish, so the top-`k`
 sum is the full squared norm. -/
@@ -187,8 +181,7 @@ theorem kyFan_le (T : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E) (hQ : Q.IsSymmetr
       = (hSsymm.eigenvalues (rfl : finrank 𝕜 E = finrank 𝕜 E) i : 𝕜) • b i := fun i => by
     rw [hb]; exact hSsymm.apply_eigenvectorBasis rfl i
   have hinner : ∀ i, (inner 𝕜 (b i) (Q (b i)) : 𝕜) = (‖Q (b i)‖ : 𝕜) ^ 2 := fun i => by
-    have h := hQ.isSymmetric (b i) (Q (b i)); rw [hQQ (b i)] at h
-    rw [← h]; exact inner_self_eq_norm_sq_to_K _
+    rw [← inner_self_eq_norm_sq_to_K, hQ.isSymmetric (b i) (Q (b i)), hQQ]
   have hc0 : ∀ i, 0 ≤ RCLike.re (inner 𝕜 (b i) (Q (b i))) := fun i => by
     rw [hinner i, RCLike.re_ofReal_pow]; positivity
   have hc1 : ∀ i, RCLike.re (inner 𝕜 (b i) (Q (b i))) ≤ 1 := fun i => by
@@ -206,12 +199,10 @@ theorem kyFan_le (T : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E) (hQ : Q.IsSymmetr
     rw [LinearMap.trace_eq_sum_inner (Q ∘ₗ (adjoint T ∘ₗ T)) b, map_sum]
     refine Finset.sum_congr rfl fun i _ => ?_
     rw [LinearMap.comp_apply, happ i, map_smul, inner_smul_right, RCLike.re_ofReal_mul]
-  rw [htrace]
-  refine le_trans (weighted_sum_le_top (hSsymm.eigenvalues_antitone rfl) ?_ hc0 hc1 hk hsum_c) ?_
-  · exact fun i => by rw [← T.sq_singularValues_fin rfl i]; positivity
-  · rw [topSqSingularValues]
-    exact le_of_eq ((Finset.sum_congr rfl fun i _ => (T.sq_singularValues_fin rfl i).symm).trans
-      (sum_filter_sq_singularValues_eq_range T k))
+  rw [htrace, topSqSingularValues, ← sum_filter_sq_singularValues_eq_range,
+    Finset.sum_congr rfl fun i _ => T.sq_singularValues_fin rfl i]
+  exact weighted_sum_le_top (hSsymm.eigenvalues_antitone rfl)
+    (fun i => by rw [← T.sq_singularValues_fin rfl i]; positivity) hc0 hc1 hk hsum_c
 
 /-- Frobenius–Pythagoras identity: for a symmetric projection (orthogonal projection) `P`,
 `‖M ∘ₗ P‖² = re tr(P ∘ₗ adjoint M ∘ₗ M)`. -/
@@ -227,8 +218,8 @@ theorem hilbertSchmidt_norm_sq_comp_proj (M : E →ₗ[𝕜] F) (P : E →ₗ[�
 /-- The dropped Frobenius sum `re tr(P ∘ₗ adjoint M ∘ₗ M) = ‖M ∘ₗ P‖² ≥ 0`. -/
 theorem re_trace_proj_comp_self_nonneg (M : E →ₗ[𝕜] F) (P : E →ₗ[𝕜] E)
     (hP : P.IsSymmetricProjection) :
-    0 ≤ RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint M ∘ₗ M))) := by
-  rw [← hilbertSchmidt_norm_sq_comp_proj M P hP]; exact sq_nonneg _
+    0 ≤ RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint M ∘ₗ M))) :=
+  hilbertSchmidt_norm_sq_comp_proj M P hP ▸ sq_nonneg _
 
 /-- Frobenius–Pythagoras (identity form) for the complementary projection `1 - Q`. -/
 theorem hilbertSchmidt_norm_sq_comp_one_sub_proj (M : E →ₗ[𝕜] F) (Q : E →ₗ[𝕜] E)
@@ -265,9 +256,8 @@ theorem eckart_young_lower (T : E →ₗ[𝕜] F) (k : ℕ) (S : E →ₗ[𝕜] 
     omega
   have hSQ : S ∘ₗ (1 - Q) = 0 := by
     ext x
-    have hmem : x - Q x ∈ LinearMap.ker S := by
-      have h := ((LinearMap.ker S)ᗮ).sub_starProjection_mem_orthogonal x
-      rwa [Submodule.orthogonal_orthogonal] at h
+    have hmem : x - Q x ∈ LinearMap.ker S := (LinearMap.ker S).orthogonal_orthogonal ▸
+      ((LinearMap.ker S)ᗮ).sub_starProjection_mem_orthogonal x
     simpa using LinearMap.mem_ker.mp hmem
   have hTS : (T - S) ∘ₗ (1 - Q) = T ∘ₗ (1 - Q) := by rw [LinearMap.sub_comp, hSQ, sub_zero]
   have hky : RCLike.re (LinearMap.trace 𝕜 E (Q ∘ₗ (adjoint T ∘ₗ T))) ≤ topSqSingularValues T k :=
@@ -307,8 +297,7 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
       refine Submodule.isOrtho_span.mpr ?_ (Submodule.mem_span_singleton_self (b i))
       rintro u (rfl : u = b i) v hv
       obtain ⟨j, hjs, rfl⟩ := Finset.mem_image.mp (Finset.mem_coe.mp hv)
-      rw [hs, Finset.mem_filter] at hjs
-      exact b.orthonormal.2 (Fin.ne_of_val_ne (by omega))
+      exact b.orthonormal.2 (Fin.ne_of_val_ne (by simp [hs] at hjs; omega))
   -- the projected Gram sum equals the top squared singular-value sum
   have hPtr : RCLike.re (LinearMap.trace 𝕜 E (P ∘ₗ (adjoint T ∘ₗ T)))
       = topSqSingularValues T k := by
@@ -317,8 +306,7 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
     refine Finset.sum_congr rfl fun i _ => ?_
     rw [LinearMap.comp_apply, happ i, map_smul, inner_smul_right, RCLike.re_ofReal_mul, hPb i]
     by_cases hik : (i : ℕ) < k
-    · simp only [if_pos hik, inner_self_eq_norm_sq, b.orthonormal.1 i, one_pow, mul_one]
-      exact (T.sq_singularValues_fin rfl i).symm
+    · simp [if_pos hik, b.orthonormal.1 i, ← T.sq_singularValues_fin rfl i]
     · simp only [if_neg hik, inner_zero_right, map_zero, mul_zero]
   refine ⟨T ∘ₗ P, ?_, ?_⟩
   · -- rank (T ∘ₗ P) ≤ k
@@ -326,8 +314,7 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
     refine (Submodule.finrank_map_le T (LinearMap.range P)).trans ?_
     rw [hP, Submodule.range_starProjection, hU]
     refine (finrank_span_finset_le_card _).trans (Finset.card_image_le.trans ?_)
-    rw [hs, Fin.card_filter_val_lt]
-    omega
+    simp [hs, Fin.card_filter_val_lt]
   · -- ‖T - T ∘ₗ P‖² = tailSqSingularValues T k
     have hTS : T - T ∘ₗ P = T ∘ₗ (1 - P) := by
       rw [LinearMap.comp_sub, Module.End.one_eq_id, LinearMap.comp_id]
@@ -338,11 +325,8 @@ theorem eckart_young_achievable (T : E →ₗ[𝕜] F) (k : ℕ) :
 a rank-`≤ k` approximation of `T` is the tail sum `∑_{i ≥ k} σ_i(T)²`. -/
 theorem eckart_young (T : E →ₗ[𝕜] F) (k : ℕ) :
     IsLeast {r : ℝ | ∃ S : E →ₗ[𝕜] F, finrank 𝕜 (LinearMap.range S) ≤ k ∧ r = ‖T - S‖ ^ 2}
-      (tailSqSingularValues T k) := by
-  constructor
-  · obtain ⟨S, hS, hSe⟩ := eckart_young_achievable T k
-    exact ⟨S, hS, hSe.symm⟩
-  · rintro r ⟨S, hS, rfl⟩
-    exact eckart_young_lower T k S hS
+      (tailSqSingularValues T k) :=
+  ⟨(eckart_young_achievable T k).imp fun _ h => ⟨h.1, h.2.symm⟩,
+    fun _ ⟨S, hS, hr⟩ => hr.symm ▸ eckart_young_lower T k S hS⟩
 
 end LinearMap
