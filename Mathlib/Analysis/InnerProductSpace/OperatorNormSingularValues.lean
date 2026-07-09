@@ -75,15 +75,12 @@ theorem norm_toContinuousLinearMap_eq_singularValues_zero (T : E →ₗ[𝕜] F)
   · haveI : CompleteSpace E := FiniteDimensional.complete 𝕜 E
     haveI : CompleteSpace F := FiniteDimensional.complete 𝕜 F
     have hcomp : (T.toContinuousLinearMap).adjoint ∘L T.toContinuousLinearMap
-        = (adjoint T ∘ₗ T).toContinuousLinearMap := by
-      ext x
-      rw [← adjoint_toContinuousLinearMap]
-      simp [coe_toContinuousLinearMap']
+        = (adjoint T ∘ₗ T).toContinuousLinearMap := ContinuousLinearMap.ext fun x => by
+      simp [← adjoint_toContinuousLinearMap, coe_toContinuousLinearMap']
     have key : ‖T.toContinuousLinearMap‖ ^ 2 = T.singularValues 0 ^ 2 := by
       rw [sq, ← ContinuousLinearMap.norm_adjoint_comp_self, hcomp,
         (T.isPositive_adjoint_comp_self).norm_toContinuousLinearMap_eq_eigenvalues_zero rfl hpos]
       exact (T.sq_singularValues_fin rfl ⟨0, hpos⟩).symm
-    rw [← Real.sqrt_sq (norm_nonneg (T.toContinuousLinearMap)), key,
-      Real.sqrt_sq (T.singularValues_nonneg 0)]
+    exact (sq_eq_sq₀ (norm_nonneg _) (T.singularValues_nonneg 0)).mp key
 
 end LinearMap
